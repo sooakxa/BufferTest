@@ -22,6 +22,9 @@ BufferTestAudioProcessor::BufferTestAudioProcessor()
                        )
 #endif
 {
+    // Adds the threshold parameter to the AudioProcessor
+    panPosition = new juce::AudioParameterFloat("panPosition", "Pan Position", -1.0f, 1.0f, 0.0f);
+    addParameter(panPosition);
 }
 
 BufferTestAudioProcessor::~BufferTestAudioProcessor()
@@ -143,6 +146,9 @@ void BufferTestAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
+    
+    // Calculate p'
+    float pDash = (panPosition->get() + 1.0f) / 2.0f;
 
     // This is the place where you'd normally do the guts of your plugin's
     // audio processing...
@@ -153,7 +159,19 @@ void BufferTestAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto* channelData = buffer.getWritePointer (channel);
-        // ..do something to the data...
+        
+        for (int i = 0; i < buffer.getNumSamples(); i++)
+    {
+            if (channel == 0)  // Left Channel
+            {
+                    channelData[i] = channelData[i] * (1.0 - pDash);
+            }
+            else // Right channel (or other channels)
+            {
+                    channelData[i] = channelData[i] * pDash;
+            }
+                    
+        }
     }
 }
 
@@ -165,13 +183,19 @@ bool BufferTestAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* BufferTestAudioProcessor::createEditor()
 {
-    return new BufferTestAudioProcessorEditor (*this);
+    return new juce::GenericAudioProcessorEditor(*this);
 }
 
 //==============================================================================
 void BufferTestAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     // You should use this method to store your parameters in the memory block.
+    
+    // Create a memory stream object
+    juce::MemoryOutputStream stream(destData, true);
+    
+    // Store a float into memory
+    stream.writeFloat(*panPosition);
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
 }
@@ -180,6 +204,12 @@ void BufferTestAudioProcessor::setStateInformation (const void* data, int sizeIn
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+    
+    //Create memory stream object
+    juce::MemoryInputStream stream(data, static_cast<size_t> (sizeInBytes), false);
+    
+    //Read a float from memory i.e. retrive the parameter value
+    *panPosition = stream.readFloat();
 }
 
 //==============================================================================
